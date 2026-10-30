@@ -110,6 +110,11 @@
   .capnote{font-size:10.5px;color:var(--ink2);margin-top:4px;text-align:center;
     line-height:1.35;min-height:14px}
 
+  /* 重播按钮 */
+  .replay{display:block;margin:7px auto 1px;font-size:11.5px;line-height:1.4;color:var(--cinnabar);
+    border:1px solid #e3c9bc;background:#fdf6f3;border-radius:7px;padding:3px 14px;font-family:inherit;letter-spacing:1px}
+  .replay:active{background:#f1dfd8}
+
   /* 常见错误 */
   .mists{margin-top:12px;background:#f6ece0;border-radius:9px;padding:10px 12px}
   .mists h4{font-size:12.5px;color:var(--cinnabar);margin-bottom:5px;font-weight:600}
@@ -163,7 +168,7 @@
 
   <main id="out"></main>
 
-  <footer>内容源自「书法结构学习台 · 单字精练」知识库<br>错形为规律形变演示，供对照辨识，不评优劣</footer>
+  <footer>练字查字 v1.2 · 更新于 2026-10-30<br>内容源自「书法结构学习台 · 单字精练」知识库 · 错形为规律形变演示，供对照辨识</footer>
 </div>
 
 <script>
@@ -241,18 +246,45 @@
     return d;
   }
 
+  /* 按笔画真实边界计算「等比缩放 + 居中」变换，把字收进田字格内框
+     （hanzi-writer 原始坐标会越界到 ~1077，不收会被画布裁掉底部） */
+  function fitTransform(strokes, medians){
+    var minX = 1e9, maxX = -1e9, minY = 1e9, maxY = -1e9, i, j, pts;
+    function add(x, y){
+      if(x < minX) minX = x; if(x > maxX) maxX = x;
+      if(y < minY) minY = y; if(y > maxY) maxY = y;
+    }
+    for(i = 0; i < strokes.length; i++){
+      var nums = (strokes[i].match(/-?\d+\.?\d*/g) || []).map(Number);
+      for(j = 0; j + 1 < nums.length; j += 2) add(nums[j], nums[j + 1]);
+    }
+    for(i = 0; i < medians.length; i++){
+      pts = medians[i] || [];
+      for(j = 0; j < pts.length; j++) add(pts[j][0], pts[j][1]);
+    }
+    if(minX > maxX) return {s: 1, tx: 0, ty: 0};
+    var w = maxX - minX, h = maxY - minY;
+    if(w < 1) w = 1; if(h < 1) h = 1;
+    var H = 410;                                  // 内框半边：字含边距落在 [102,922]
+    var s = (2 * H) / Math.max(w, h);
+    var cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
+    return {s: s, tx: 512 - s * cx, ty: 512 - s * cy};
+  }
+
   /* 逐笔描红：mask 内白色粗中线 dashoffset 100→0，沿笔迹揭示笔画轮廓。
      charInner 返回 <svg> 内部内容（不含外层 svg 标签），便于在排布动画里按 <g> 复用。 */
   function charInner(strokes, medians, color, keys, opts){
     opts = opts || {};
     var id = "u" + (++uid), out = [], i, n = strokes.length, tf = opts.tf || {};
     var step = n > 1 ? Math.min(0.22, TOTAL / n) : 0;
+    var fit = fitTransform(strokes, medians);
+    out.push('<g transform="translate(' + fit.tx.toFixed(2) + ' ' + fit.ty.toFixed(2) + ') scale(' + fit.s.toFixed(4) + ')">');
     out.push('<defs>');
     for(i = 0; i < n; i++){
       var mp = medianPath(medians[i]);
       if(!mp) continue;
       var tfm = tf[i] ? ' transform="' + tf[i] + '"' : '';
-      out.push('<mask id="' + id + 'm' + i + '" maskUnits="userSpaceOnUse" x="0" y="0" width="1024" height="1024">'
+      out.push('<mask id="' + id + 'm' + i + '" maskUnits="userSpaceOnUse" x="-200" y="-200" width="1448" height="1448">'
         + '<path' + tfm + ' class="bp" style="animation-delay:' + (i * step).toFixed(2) + 's;animation-duration:' + DUR + 's" d="' + mp
         + '" stroke="#fff" stroke-width="160" fill="none" stroke-linecap="round" stroke-linejoin="round"'
         + ' pathLength="100" stroke-dasharray="100" stroke-dashoffset="100"/></mask>');
@@ -267,6 +299,7 @@
       out.push('<path d="' + strokes[i] + '"' + (tf[i] ? ' transform="' + tf[i] + '"' : '')
         + ' fill="' + fill + '"' + (opts.still ? '' : ' mask="url(#' + id + 'm' + i + ')"') + '/>');
     }
+    out.push('</g>');
     out.push('</g>');
     return out.join("");
   }
@@ -296,6 +329,7 @@
         +   '<div class="cap ok">✓ 正确写法</div>'
         +   frame(rightSvg).replace('class="frame"', 'class="frame ok"')
         +   '<div class="capnote">' + esc(tip.y || "") + '</div>'
+        +   '<button class="replay" type="button" data-replay>↻ 重播</button>'
         + '</div></div>';
     }
     var wrongSvg = drawSvg(hw.s, hw.p, BROWN, [], {wrong:true, tf:tf});
@@ -304,11 +338,13 @@
       +   '<div class="cap ng">✗ 常见错误</div>'
       +   frame(wrongSvg).replace('class="frame"', 'class="frame wob"')
       +   '<div class="capnote">' + esc(tip.x || "") + '</div>'
+      +   '<button class="replay" type="button" data-replay>↻ 重播</button>'
       + '</div>'
       + '<div class="cell">'
       +   '<div class="cap ok">✓ 正确写法</div>'
       +   frame(rightSvg).replace('class="frame"', 'class="frame ok"')
       +   '<div class="capnote">' + esc(tip.y || "") + '</div>'
+      +   '<button class="replay" type="button" data-replay>↻ 重播</button>'
       + '</div></div>';
   }
 
@@ -340,10 +376,12 @@
     var ok = '<div class="pair">'
       + '<div class="cell"><div class="cap ng">✗ 常见错误</div>'
       + frame(_rowSvg(chars, true)).replace('class="frame"', 'class="frame wob"')
-      + '<div class="capnote">字距失衡 · 行气断裂</div></div>'
+      + '<div class="capnote">字距失衡 · 行气断裂</div>'
+      + '<button class="replay" type="button" data-replay>↻ 重播</button></div>'
       + '<div class="cell"><div class="cap ok">✓ 正确写法</div>'
       + frame(_rowSvg(chars, false)).replace('class="frame"', 'class="frame ok"')
-      + '<div class="capnote">行气连贯 · 错落有致</div></div></div>';
+      + '<div class="capnote">行气连贯 · 错落有致</div>'
+      + '<button class="replay" type="button" data-replay>↻ 重播</button></div></div>';
     return ok;
   }
 
@@ -373,7 +411,9 @@
 
     if(!tips.length){
       h += '<div class="empty">知识库暂无「' + esc(ch) + '」的专项点拨<br>下面是对照的正确写法</div>';
-      h += '<div class="pair single"><div class="cell">' + frame(drawSvg(data.s, data.p, INK, [], {})) + '</div></div>';
+      h += '<div class="pair single"><div class="cell"><div class="cap ok">✓ 正确写法</div>'
+        + frame(drawSvg(data.s, data.p, INK, [], {})).replace('class="frame"', 'class="frame ok"')
+        + '<button class="replay" type="button" data-replay>↻ 重播</button></div></div>';
     } else {
       // 排序：有错形动画 > 有辅助可视化 > 专属规律（非通用主笔） > 其他，同分保持原序
       var ranked = tips.map(function(t, k){ return {t: t, k: k}; });
@@ -633,11 +673,12 @@
       box.scrollIntoView({behavior: "smooth", block: "nearest"});
       return;
     }
-    // 点格子重播动画
-    var fr = t.closest ? t.closest(".frame") : null;
+    // 点格子或点「重播」按钮，重播该格动画
+    var rb = t.closest ? t.closest("[data-replay]") : null;
+    var fr = rb ? rb.closest(".frame") : (t.closest ? t.closest(".frame") : null);
     if(fr){
-      var svg = fr.querySelector("svg");
-      if(svg){ var s = svg.parentNode.innerHTML; svg.parentNode.innerHTML = ""; svg.parentNode.innerHTML = s; }
+      var box = fr.querySelector(".box");
+      if(box){ var s = box.innerHTML; box.innerHTML = ""; box.innerHTML = s; }
     }
   });
 
