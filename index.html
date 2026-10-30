@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="format-detection" content="telephone=no">
+<meta name="theme-color" content="#f5f0e4">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>练字查字 · 规律点拨与错误示范</title>
+<style>
+  :root{
+    --paper:#f5f0e4; --paper2:#fbf7ec; --card:#fffdf6; --ink:#2c2825; --ink2:#6b6257;
+    --cinnabar:#a8352a; --cinnabar2:#c05a4c; --gold:#a98a4f; --line:#e3d9c4; --line2:#d6c9ac;
+    --grid:#d9a89c; --green:#4a7a5a; --brown:#7a5c43;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    background:var(--paper); color:var(--ink); line-height:1.65;
+    font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Source Han Sans SC",sans-serif;
+    -webkit-font-smoothing:antialiased; padding-bottom:32px;
+  }
+  .wrap{max-width:560px;margin:0 auto;padding:0 12px}
+
+  /* 顶部 */
+  header.top{padding:20px 0 12px;text-align:center;position:relative}
+  header.top h1{font-size:21px;letter-spacing:3px;font-weight:700;color:var(--ink)}
+  header.top h1 .seal{display:inline-block;font-size:10px;color:#fff;background:var(--cinnabar);
+    border-radius:3px;padding:1px 5px;margin-left:6px;letter-spacing:1px;vertical-align:2px;font-weight:400}
+  header.top p{font-size:12px;color:var(--ink2);margin-top:5px}
+
+  /* 搜索 */
+  .search{display:flex;gap:8px;margin:6px 0 10px}
+  .search input{
+    flex:1;min-width:0;height:46px;border:1px solid var(--line2);background:var(--card);
+    border-radius:10px;padding:0 14px;font-size:17px;color:var(--ink);font-family:inherit;
+    outline:none;box-shadow:inset 0 1px 2px rgba(90,70,40,.04);
+  }
+  .search input:focus{border-color:var(--cinnabar2);box-shadow:0 0 0 3px rgba(168,53,42,.08)}
+  .search input::placeholder{color:#b0a795;font-size:14px}
+  .search button{
+    flex:none;width:76px;height:46px;border:0;border-radius:10px;background:var(--cinnabar);
+    color:#fff;font-size:16px;font-family:inherit;letter-spacing:2px;font-weight:600;
+  }
+  .search button:active{background:#8f2c22}
+
+  /* 热门 / 规律 */
+  .chips{display:flex;flex-wrap:wrap;gap:7px;margin:0 0 4px}
+  .chip{
+    border:1px solid var(--line2);background:var(--card);color:var(--ink);border-radius:8px;
+    padding:5px 11px;font-size:14px;line-height:1.3;font-family:inherit;
+  }
+  .chip:active{background:#f1e7d2}
+  .chip.rule{font-size:12.5px;color:var(--cinnabar);border-color:#e3c9bc;background:#fdf6f3;padding:5px 10px}
+
+  .hotline{margin:2px 0 12px}
+  .hotline .lbl{font-size:11.5px;color:var(--ink2);margin-bottom:6px;letter-spacing:1px}
+  .hotline .lbl b{color:var(--cinnabar);font-weight:400}
+
+  .panel{background:var(--paper2);border:1px solid var(--line);border-radius:12px;padding:12px;margin:0 0 14px}
+
+  /* 字卡 */
+  .card{
+    background:var(--card);border:1px solid var(--line);border-radius:14px;
+    padding:14px 12px 12px;margin-bottom:16px;box-shadow:0 2px 12px rgba(90,70,40,.05);
+  }
+  .card-head{display:flex;align-items:flex-start;gap:10px;padding-bottom:10px;
+    border-bottom:1px dashed var(--line)}
+  .glyph{font-size:38px;line-height:1;font-weight:500;color:var(--ink);
+    font-family:"Songti SC","STSong","SimSun",serif;flex:none;padding-top:2px}
+  .card-meta{flex:1;min-width:0;padding-top:2px}
+  .card-meta .cn{font-size:12.5px;color:var(--ink2)}
+  .card-meta .tk{font-size:11.5px;color:var(--gold);margin-top:3px;line-height:1.5}
+
+  /* 规律块 */
+  .tip{padding:13px 0 2px;border-bottom:1px solid #f0e8d6}
+  .tip:last-child{border-bottom:0}
+  .tip-head{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+  .tip-no{flex:none;font-size:10.5px;color:#fff;background:var(--cinnabar);border-radius:4px;
+    padding:0 5px;line-height:1.7}
+  .tip-nm{font-size:15px;font-weight:700;color:var(--cinnabar);letter-spacing:.5px}
+  .tip-ks{margin-left:auto;flex:none;font-size:11px;color:var(--ink2)}
+  .tip-txt{font-size:13.5px;color:var(--ink);margin-top:5px}
+  .tip-why{font-size:12px;color:var(--ink2);margin-top:4px;padding-left:2px}
+  .tip-why::before{content:"为何 ";color:var(--gold);font-size:10.5px}
+
+  /* 错对对比双格 */
+  .pair{display:flex;gap:8px;margin:10px 0 4px}
+  .pair.single .cell{flex:1}
+  .cell{flex:1 1 0;min-width:0}
+  .cap{font-size:11px;line-height:1.4;padding:3px 6px;border-radius:5px;margin-bottom:5px;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center}
+  .cap.ng{background:#f7e6e2;color:var(--cinnabar)}
+  .cap.ok{background:#e6efe8;color:var(--green)}
+  .frame{position:relative;width:100%;padding-top:100%;border-radius:8px;overflow:hidden;
+    background:#fffdf8;border:1px solid var(--line)}
+  .frame .box{position:absolute;left:0;top:0;right:0;bottom:0}
+  .frame svg{display:block;width:100%;height:100%}
+  .capnote{font-size:10.5px;color:var(--ink2);margin-top:4px;text-align:center;
+    line-height:1.35;min-height:14px}
+
+  /* 常见错误 */
+  .mists{margin-top:12px;background:#f6ece0;border-radius:9px;padding:10px 12px}
+  .mists h4{font-size:12.5px;color:var(--cinnabar);margin-bottom:5px;font-weight:600}
+  .mists li{font-size:12px;color:var(--ink);margin:3px 0;list-style:none;padding-left:0;line-height:1.55}
+  .mists li b{color:var(--brown);font-weight:600}
+  .mists li .f{color:var(--green)}
+
+  .empty{text-align:center;color:var(--ink2);font-size:13px;padding:26px 10px;line-height:1.9}
+  .loading{text-align:center;color:var(--ink2);font-size:12.5px;padding:16px}
+
+  footer{text-align:center;color:#9a9184;font-size:11px;margin-top:18px;line-height:1.8;padding:0 10px}
+
+  /* 描红动画：mask 白色中线 dashoffset 100→0，逐笔揭示（纯 CSS，无库、离线可看） */
+  @keyframes bpdraw{from{stroke-dashoffset:100}to{stroke-dashoffset:0}}
+  @keyframes bpulse{0%,100%{opacity:1}50%{opacity:.72}}
+  /* 默认笔画完整可见（未进入视口也不空白）；进入视口(.run)时重播一次逐笔书写 */
+  .bp{stroke-dashoffset:0}
+  .run .bp{animation:bpdraw .34s linear backwards}
+  .run .bpg{animation:bpulse 2.2s ease-in-out infinite}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1>练字查字<span class="seal">结字有法</span></h1>
+    <p>输入想学的字 · 看规律点拨与错误示范</p>
+  </header>
+
+  <div class="search">
+    <input id="q" type="search" maxlength="6" inputmode="search" enterkeyhint="search"
+           autocomplete="off" autocorrect="off" spellcheck="false" placeholder="输入汉字，如：林">
+    <button id="go" type="button">查字</button>
+  </div>
+
+  <div id="home">
+    <div class="hotline"><div class="lbl" id="hotlbl">常用字</div><div class="chips" id="hot"></div></div>
+  </div>
+
+  <main id="out"></main>
+
+  <footer>内容源自「书法结构学习台 · 单字精练」知识库<br>错形为规律形变演示，供对照辨识，不评优劣</footer>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var INK = "#2c2825", BROWN = "#5d4433", KEY = "#a8352a", DUR = 0.34, TOTAL = 1.15;
+  var LIST = [], IDX = {}, PAGE = 40, HOT = [], RULES = [], READY = false, cache = {}, uid = 0, SEQ = 0;
+
+  var qEl = document.getElementById("q");
+  var goEl = document.getElementById("go");
+  var outEl = document.getElementById("out");
+  var homeEl = document.getElementById("home");
+  var hotEl = document.getElementById("hot");
+
+  /* ---------- 工具 ---------- */
+  function pad3(n){ n = String(n); while(n.length < 3) n = "0" + n; return n; }
+  function esc(s){
+    return String(s == null ? "" : s).replace(/[&<>"]/g, function(c){
+      return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];
+    });
+  }
+  function xhr(url, cb){
+    var x = new XMLHttpRequest();
+    x.open("GET", url, true);
+    x.onreadystatechange = function(){
+      if(x.readyState !== 4) return;
+      if(x.status === 200 || x.status === 0){
+        try { cb(JSON.parse(x.responseText)); }
+        catch(e){ cb(null); }
+      } else { cb(null); }
+    };
+    x.send(null);
+  }
+
+  /* ---------- 图形 ---------- */
+  function mige(){
+    return '<rect x="26" y="26" width="972" height="972" fill="none" stroke="' + "#d9a89c" + '" stroke-width="7" rx="6"/>'
+      + '<line x1="512" y1="26" x2="512" y2="998" stroke="#e6c4ba" stroke-width="3" stroke-dasharray="16 13"/>'
+      + '<line x1="26" y1="512" x2="998" y2="512" stroke="#e6c4ba" stroke-width="3" stroke-dasharray="16 13"/>'
+      + '<line x1="26" y1="26" x2="998" y2="998" stroke="#eddfc9" stroke-width="3" stroke-dasharray="16 13"/>'
+      + '<line x1="998" y1="26" x2="26" y2="998" stroke="#eddfc9" stroke-width="3" stroke-dasharray="16 13"/>';
+  }
+
+  function medianPath(m){
+    if(!m || !m.length) return "";
+    var d = "M " + m[0][0] + " " + m[0][1], i;
+    for(i = 1; i < m.length; i++) d += " L " + m[i][0] + " " + m[i][1];
+    return d;
+  }
+
+  /* 逐笔描红：mask 内白色粗中线 dashoffset 100→0，沿笔迹揭示笔画轮廓 */
+  function drawSvg(strokes, medians, color, keys, opts){
+    opts = opts || {};
+    var id = "u" + (++uid), out = ['<svg viewBox="0 0 1024 1024" preserveAspectRatio="xMidYMid meet">'];
+    out.push(mige());
+    out.push('<defs>');
+    var i, n = strokes.length, tf = opts.tf || {};
+    var step = n > 1 ? Math.min(0.22, TOTAL / n) : 0;
+    for(i = 0; i < n; i++){
+      var mp = medianPath(medians[i]);
+      if(!mp) continue;
+      var tfm = tf[i] ? ' transform="' + tf[i] + '"' : '';
+      out.push('<mask id="' + id + 'm' + i + '" maskUnits="userSpaceOnUse" x="0" y="0" width="1024" height="1024">'
+        + '<path' + tfm + ' class="bp" style="animation-delay:' + (i * step).toFixed(2) + 's;animation-duration:' + DUR + 's" d="' + mp
+        + '" stroke="#fff" stroke-width="160" fill="none" stroke-linecap="round" stroke-linejoin="round"'
+        + ' pathLength="100" stroke-dasharray="100" stroke-dashoffset="100"/></mask>');
+    }
+    out.push('</defs>');
+    out.push('<g' + (opts.wrong ? ' class="bpg"' : '') + '>');
+    for(i = 0; i < n; i++){
+      var fill = (keys && keys.indexOf(i) >= 0) ? KEY : color;
+      out.push('<path d="' + strokes[i] + '"' + (tf[i] ? ' transform="' + tf[i] + '"' : '')
+        + ' fill="' + fill + '"' + (opts.still ? '' : ' mask="url(#' + id + 'm' + i + ')"') + '/>');
+    }
+    out.push('</g></svg>');
+    return out.join("");
+  }
+
+  /* ---------- 渲染 ---------- */
+  function frame(html){
+    return '<div class="frame"><div class="box">' + html + '</div></div>';
+  }
+
+  function pairHtml(tip, hw){
+    var tf = tip.o || {};
+    var hasWrong = !!Object.keys(tf).length;
+    var rightSvg = drawSvg(hw.s, hw.p, INK, tip.k || [], {});
+    if(!hasWrong){
+      return '<div class="pair single">'
+        + '<div class="cell">'
+        +   '<div class="cap ok">✓ 正确写法</div>'
+        +   frame(rightSvg)
+        +   '<div class="capnote">' + esc(tip.y || "") + '</div>'
+        + '</div></div>';
+    }
+    var wrongSvg = drawSvg(hw.s, hw.p, BROWN, [], {wrong:true, tf:tf});
+    return '<div class="pair">'
+      + '<div class="cell">'
+      +   '<div class="cap ng">✗ 常见错误</div>'
+      +   frame(wrongSvg)
+      +   '<div class="capnote">' + esc(tip.x || "") + '</div>'
+      + '</div>'
+      + '<div class="cell">'
+      +   '<div class="cap ok">✓ 正确写法</div>'
+      +   frame(rightSvg)
+      +   '<div class="capnote">' + esc(tip.y || "") + '</div>'
+      + '</div></div>';
+  }
+
+  function ruleColor(name){
+    if(!name) return "#a98a4f";
+    if(/主笔|伸展|舒展|放纵|突出/.test(name)) return "#a8352a";
+    if(/穿插|避让|收放|让/.test(name)) return "#c05a4c";
+    if(/重心|平稳|居中|平正/.test(name)) return "#4a7a5a";
+    if(/比例|匀称|疏密|布白/.test(name)) return "#a98a4f";
+    if(/对齐|对应|对称|呼应/.test(name)) return "#3f6f8f";
+    if(/错落|参差|高低|向背/.test(name)) return "#8a6f3f";
+    return "#a98a4f";
+  }
+
+  function renderChar(ch, data){
+    var tips = data.t || [], i, h;
+    var nStroke = (data.s || []).length;
+    var names = [];
+    for(i = 0; i < tips.length; i++){
+      if(tips[i].r && names.indexOf(tips[i].r) < 0) names.push(tips[i].r);
+    }
+
+    h = '<section class="card" data-ch="' + esc(ch) + '">';
+    h += '<div class="card-head"><span class="glyph">' + esc(ch) + '</span>'
+       + '<div class="card-meta"><div class="cn">' + nStroke + ' 画 · ' + tips.length + ' 条规律点拨</div>'
+       + '<div class="tk">' + esc(names.slice(0, 3).join(" · ")) + '</div></div></div>';
+
+    if(!tips.length){
+      h += '<div class="empty">知识库暂无「' + esc(ch) + '」的专项点拨<br>下面是对照的正确写法</div>';
+      h += '<div class="pair single"><div class="cell">' + frame(drawSvg(data.s, data.p, INK, [], {})) + '</div></div>';
+    } else {
+      var shown = tips.slice(0, 5);
+      for(i = 0; i < shown.length; i++){
+        var t = shown[i];
+        var col = ruleColor(t.r);
+        h += '<div class="tip" style="--c:' + col + '">'
+           + '<div class="tip-head">'
+           +   '<span class="tip-no" style="background:' + col + '">' + (i + 1) + '</span>'
+           +   '<span class="tip-nm">' + esc(t.r) + '</span>'
+           +   (t.k && t.k.length ? '<span class="tip-ks">关键笔 ' + t.k.map(function(k){ return "第" + (k + 1) + "笔"; }).join("、") + '</span>' : '')
+           + '</div>'
+           + '<div class="tip-txt">' + esc(t.t) + '</div>'
+           + (t.w ? '<div class="tip-why">' + esc(t.w) + '</div>' : '')
+           + pairHtml(t, data)
+           + '</div>';
+      }
+      if(tips.length > shown.length){
+        h += '<div class="loading">另有 ' + (tips.length - shown.length) + ' 条规律，篇幅所限未展开</div>';
+      }
+    }
+
+    if(data.m && data.m.length){
+      h += '<div class="mists"><h4>常见错误</h4><ul>';
+      for(i = 0; i < data.m.length; i++){
+        h += '<li><b>' + esc(data.m[i][0]) + '</b>　' + esc(data.m[i][1])
+           + ' <span class="f">→ ' + esc(data.m[i][2]) + '</span></li>';
+      }
+      h += '</ul></div>';
+    }
+    h += '</section>';
+    return h;
+  }
+
+  function renderMissing(ch){
+    return '<section class="card"><div class="card-head"><span class="glyph">' + esc(ch) + '</span>'
+      + '<div class="card-meta"><div class="cn">知识库暂无此字</div>'
+      + '<div class="tk">当前收录 3,761 个常用字与部件</div></div></div>'
+      + '<div class="empty">「' + esc(ch) + '」不在练字知识库中<br>试试常用字，或换一个字</div></section>';
+  }
+
+  /* 进入视口才启动动画（省算力，长列表更流畅） */
+  function startAnim(root){
+    var frames = root.querySelectorAll(".frame");
+    var i;
+    if(!("IntersectionObserver" in window)){
+      for(i = 0; i < frames.length; i++) frames[i].className += " run";
+      return;
+    }
+    var io = new IntersectionObserver(function(entries){
+      var k;
+      for(k = 0; k < entries.length; k++){
+        var el = entries[k].target;
+        if(entries[k].isIntersecting){
+          el.className += " run";
+          io.unobserve(el);
+        }
+      }
+    }, {rootMargin: "80px 0px"});
+    for(i = 0; i < frames.length; i++) io.observe(frames[i]);
+  }
+
+  /* ---------- 查询 ---------- */
+  function lookup(text){
+    var raw = String(text || "").replace(/[\s\u3000]/g, "");
+    var chars = raw.split(""), i;
+    var seen = {}, uniq = [];
+    for(i = 0; i < chars.length; i++){
+      if(!chars[i] || seen[chars[i]]) continue;
+      seen[chars[i]] = 1;
+      uniq.push(chars[i]);
+      if(uniq.length >= 4) break;
+    }
+    if(!uniq.length) return;
+
+    homeEl.style.display = "none";
+    var seq = ++SEQ;
+    outEl.innerHTML = '<div class="loading">正在查「' + esc(uniq.join("")) + '」…</div>';
+
+    // 并发取各自分片，按原序拼装
+    var slots = [], pending = uniq.length;
+    for(i = 0; i < uniq.length; i++) slots.push(null);
+
+    function flush(){
+      if(seq !== SEQ) return;
+      var html = "", ok = 0;
+      for(var k = 0; k < slots.length; k++){
+        if(slots[k] === null){ html += '<div class="loading">…</div>'; continue; }
+        html += slots[k];
+        if(slots[k].indexOf('class="card"') >= 0) ok++;
+      }
+      outEl.innerHTML = html;
+      startAnim(outEl);
+      window.scrollTo(0, 0);
+    }
+
+    uniq.forEach(function(ch, idx){
+      var gi = IDX[ch];
+      if(gi === undefined){
+        slots[idx] = renderMissing(ch);
+        if(--pending === 0) flush();
+        return;
+      }
+      var pi = Math.floor(gi / PAGE), off = gi % PAGE;
+      var done = function(d){
+        if(!d || !d.c || d.c[off] !== ch){ slots[idx] = renderMissing(ch); }
+        else { slots[idx] = renderChar(ch, d.d[off]); }
+        if(--pending === 0) flush();
+      };
+      if(cache[pi]) done(cache[pi]);
+      else xhr("data/p" + pad3(pi) + ".json", function(d){ if(d) cache[pi] = d; done(d); });
+    });
+  }
+
+  /* ---------- 首页 ---------- */
+  function showHome(){
+    homeEl.style.display = "";
+    outEl.innerHTML = "";
+    window.scrollTo(0, 0);
+  }
+
+  function renderHome(){
+    var h = "", i;
+    for(i = 0; i < HOT.length && i < 24; i++){
+      h += '<button class="chip" type="button" data-c="' + esc(HOT[i]) + '">' + esc(HOT[i]) + '</button>';
+    }
+    hotEl.innerHTML = h;
+
+    // 规律入口
+    if(RULES.length){
+      var r = '<div class="hotline"><div class="lbl">按规律找字 <b>点开看代表字</b></div><div class="chips" id="rulechips">';
+      for(i = 0; i < RULES.length && i < 10; i++){
+        r += '<button class="chip rule" type="button" data-rule="' + i + '">' + esc(RULES[i].r) + '</button>';
+      }
+      r += '</div></div><div id="rulebox"></div>';
+      homeEl.insertAdjacentHTML("beforeend", r);
+    }
+  }
+
+  document.addEventListener("click", function(e){
+    var t = e.target;
+    var chip = t.closest ? t.closest("[data-c]") : null;
+    if(chip){
+      var c = chip.getAttribute("data-c");
+      qEl.value = c;
+      lookup(c);
+      return;
+    }
+    var rc = t.closest ? t.closest("[data-rule]") : null;
+    if(rc){
+      var idx = +rc.getAttribute("data-rule");
+      var rule = RULES[idx];
+      if(!rule) return;
+      var box = document.getElementById("rulebox");
+      var html = '<div class="panel"><div style="font-size:14px;font-weight:700;color:#a8352a;margin-bottom:4px">'
+        + esc(rule.r) + '</div>';
+      if(rule.p) html += '<div style="font-size:12.5px;color:#6b6257;margin-bottom:8px">' + esc(rule.p) + '</div>';
+      html += '<div class="chips">';
+      for(var i = 0; i < rule.c.length; i++){
+        html += '<button class="chip" type="button" data-c="' + esc(rule.c[i]) + '">' + esc(rule.c[i]) + '</button>';
+      }
+      html += '</div></div>';
+      box.innerHTML = html;
+      box.scrollIntoView({behavior: "smooth", block: "nearest"});
+      return;
+    }
+    // 点格子重播动画
+    var fr = t.closest ? t.closest(".frame") : null;
+    if(fr){
+      var svg = fr.querySelector("svg");
+      if(svg){ var s = svg.parentNode.innerHTML; svg.parentNode.innerHTML = ""; svg.parentNode.innerHTML = s; }
+    }
+  });
+
+  goEl.addEventListener("click", function(){ lookup(qEl.value); });
+  qEl.addEventListener("keydown", function(e){
+    if(e.keyCode === 13){ qEl.blur(); lookup(qEl.value); }
+  });
+  qEl.addEventListener("search", function(){ lookup(qEl.value); });
+
+  /* ---------- 启动 ---------- */
+  xhr("data/index.json", function(d){
+    if(!d){
+      outEl.innerHTML = '<div class="empty">数据加载失败<br>请检查网络后刷新</div>';
+      return;
+    }
+    LIST = d.list || [];
+    PAGE = d.page || 40;
+    HOT = d.hot || [];
+    RULES = d.rules || [];
+    var i;
+    for(i = 0; i < LIST.length; i++) IDX[LIST[i]] = i;
+    READY = true;
+    var m = location.search.match(/[?&]c=([^&]*)/);
+    if(m){
+      var v = decodeURIComponent(m[1]);
+      if(v){ qEl.value = v; lookup(v); return; }
+    }
+    renderHome();
+  });
+})();
+</script>
+</body>
+</html>
