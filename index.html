@@ -58,6 +58,17 @@
   .hotline .lbl b{color:var(--cinnabar);font-weight:400}
 
   .panel{background:var(--paper2);border:1px solid var(--line);border-radius:12px;padding:12px;margin:0 0 14px}
+  .cat{font-size:12.5px}
+  .cat-title{font-size:14px;font-weight:700;color:var(--ink);margin-bottom:6px;letter-spacing:1px}
+  .rule-item{padding:9px 0;border-bottom:1px solid #eee4d2}
+  .rule-item:last-child{border-bottom:0}
+  .rule-name{font-size:13.5px;font-weight:700;color:var(--cinnabar)}
+  .rule-viz{font-size:10px;color:var(--gold);border:1px solid #dcc9a8;border-radius:4px;
+    padding:0 4px;margin-left:6px;font-weight:400;vertical-align:1px}
+  .rule-tip{font-size:12.5px;color:var(--ink);margin-top:3px}
+  .rule-err{font-size:11.5px;color:var(--ink2);margin-top:2px}
+  .rule-chips{margin-top:6px;display:flex;flex-wrap:wrap;gap:5px}
+  .rule-chips .chip{font-size:12.5px;padding:3px 9px}
 
   /* 字卡 */
   .card{
@@ -146,7 +157,7 @@
 (function(){
   "use strict";
   var INK = "#2c2825", BROWN = "#5d4433", KEY = "#a8352a", DUR = 0.34, TOTAL = 1.15;
-  var LIST = [], IDX = {}, PAGE = 40, HOT = [], RULES = [], READY = false, cache = {}, uid = 0, SEQ = 0;
+  var LIST = [], IDX = {}, PAGE = 40, HOT = [], RULES = [], CATS = [], READY = false, cache = {}, uid = 0, SEQ = 0;
 
   var qEl = document.getElementById("q");
   var goEl = document.getElementById("go");
@@ -183,6 +194,33 @@
       + '<line x1="998" y1="26" x2="26" y2="998" stroke="#eddfc9" stroke-width="3" stroke-dasharray="16 13"/>';
   }
 
+  /* 规律辅助层：示意等距 / 对正重心 / 主笔伸展 / 宽窄 / 字形轮廓（淡色，不遮笔画） */
+  function vizLayer(v){
+    if(!v || v === "text") return "";
+    var pos = [256, 512, 768], i, g = "";
+    if(v === "equal"){
+      for(i = 0; i < 3; i++){
+        g += '<line x1="70" y1="' + pos[i] + '" x2="954" y2="' + pos[i] + '" stroke="#c8a76a" stroke-width="3" stroke-dasharray="14 12" opacity=".5"/>';
+        g += '<line x1="' + pos[i] + '" y1="70" x2="' + pos[i] + '" y2="954" stroke="#c8a76a" stroke-width="3" stroke-dasharray="14 12" opacity=".3"/>';
+      }
+    } else if(v === "align"){
+      g += '<line x1="512" y1="36" x2="512" y2="988" stroke="#4a7a5a" stroke-width="6" stroke-dasharray="10 10" opacity=".5"/>';
+      g += '<line x1="36" y1="512" x2="988" y2="512" stroke="#4a7a5a" stroke-width="3" stroke-dasharray="22 16" opacity=".26"/>';
+      g += '<circle cx="512" cy="512" r="9" fill="#4a7a5a" opacity=".5"/>';
+    } else if(v === "stretch"){
+      g += '<path d="M372 690 L668 356" stroke="#a8352a" stroke-width="6" opacity=".36" stroke-linecap="round"/>';
+      g += '<path d="M668 356 l-48 8 l20 46 z" fill="#a8352a" opacity=".48"/>';
+      g += '<line x1="190" y1="858" x2="834" y2="858" stroke="#a8352a" stroke-width="5" opacity=".28"/>';
+      g += '<path d="M190 858 l32 -13 l0 26 z" fill="#a8352a" opacity=".4"/>';
+      g += '<path d="M834 858 l-32 -13 l0 26 z" fill="#a8352a" opacity=".4"/>';
+    } else if(v === "width"){
+      g += '<rect x="150" y="118" width="724" height="788" fill="none" stroke="#8a6f3f" stroke-width="4" stroke-dasharray="18 14" opacity=".36" rx="10"/>';
+    } else if(v === "shape"){
+      g += '<path d="M512 88 L902 512 L512 936 L122 512 Z" fill="none" stroke="#3f6f8f" stroke-width="5" stroke-dasharray="16 14" opacity=".28"/>';
+    }
+    return '<g>' + g + '</g>';
+  }
+
   function medianPath(m){
     if(!m || !m.length) return "";
     var d = "M " + m[0][0] + " " + m[0][1], i;
@@ -195,6 +233,7 @@
     opts = opts || {};
     var id = "u" + (++uid), out = ['<svg viewBox="0 0 1024 1024" preserveAspectRatio="xMidYMid meet">'];
     out.push(mige());
+    if(opts.viz) out.push(vizLayer(opts.viz));
     out.push('<defs>');
     var i, n = strokes.length, tf = opts.tf || {};
     var step = n > 1 ? Math.min(0.22, TOTAL / n) : 0;
@@ -226,7 +265,7 @@
   function pairHtml(tip, hw){
     var tf = tip.o || {};
     var hasWrong = !!Object.keys(tf).length;
-    var rightSvg = drawSvg(hw.s, hw.p, INK, tip.k || [], {});
+    var rightSvg = drawSvg(hw.s, hw.p, INK, tip.k || [], {viz: tip.v});
     if(!hasWrong){
       return '<div class="pair single">'
         + '<div class="cell">'
@@ -277,7 +316,20 @@
       h += '<div class="empty">知识库暂无「' + esc(ch) + '」的专项点拨<br>下面是对照的正确写法</div>';
       h += '<div class="pair single"><div class="cell">' + frame(drawSvg(data.s, data.p, INK, [], {})) + '</div></div>';
     } else {
-      var shown = tips.slice(0, 5);
+      // 排序：有错形动画 > 有辅助可视化 > 专属规律（非通用主笔） > 其他，同分保持原序
+      var ranked = tips.map(function(t, k){ return {t: t, k: k}; });
+      ranked.sort(function(a, b){
+        function sc(x){
+          var s = 0;
+          if(x.o) s += 100;
+          if(x.v && x.v !== "text") s += 50;
+          if(x.r !== "主笔要伸展") s += 20;
+          return s;
+        }
+        var d = sc(b.t) - sc(a.t);
+        return d !== 0 ? d : a.k - b.k;
+      });
+      var shown = ranked.slice(0, 6).map(function(x){ return x.t; });
       for(i = 0; i < shown.length; i++){
         var t = shown[i];
         var col = ruleColor(t.r);
@@ -403,14 +455,23 @@
     }
     hotEl.innerHTML = h;
 
-    // 规律入口
-    if(RULES.length){
-      var r = '<div class="hotline"><div class="lbl">按规律找字 <b>点开看代表字</b></div><div class="chips" id="rulechips">';
-      for(i = 0; i < RULES.length && i < 10; i++){
-        r += '<button class="chip rule" type="button" data-rule="' + i + '">' + esc(RULES[i].r) + '</button>';
+    // 规律大全入口（优先 13 类；无则回退旧 12 条）
+    if(CATS.length){
+      var total = 0, k;
+      for(k = 0; k < CATS.length; k++) total += CATS[k].rules.length;
+      var r = '<div class="hotline"><div class="lbl">练字规律大全 <b>' + CATS.length + ' 类 · ' + total + ' 条 · 点开看例字</b></div><div class="chips" id="rulechips">';
+      for(i = 0; i < CATS.length; i++){
+        r += '<button class="chip rule" type="button" data-cat="' + i + '">' + esc(CATS[i].n) + '</button>';
       }
       r += '</div></div><div id="rulebox"></div>';
       homeEl.insertAdjacentHTML("beforeend", r);
+    } else if(RULES.length){
+      var r2 = '<div class="hotline"><div class="lbl">按规律找字 <b>点开看代表字</b></div><div class="chips" id="rulechips">';
+      for(i = 0; i < RULES.length && i < 10; i++){
+        r2 += '<button class="chip rule" type="button" data-rule="' + i + '">' + esc(RULES[i].r) + '</button>';
+      }
+      r2 += '</div></div><div id="rulebox"></div>';
+      homeEl.insertAdjacentHTML("beforeend", r2);
     }
   }
 
@@ -421,6 +482,31 @@
       var c = chip.getAttribute("data-c");
       qEl.value = c;
       lookup(c);
+      return;
+    }
+    var cc = t.closest ? t.closest("[data-cat]") : null;
+    if(cc){
+      var ci = +cc.getAttribute("data-cat");
+      var cat = CATS[ci];
+      if(!cat) return;
+      var vizName = {equal:"等距", align:"对正", stretch:"伸展", width:"宽窄", shape:"字形", text:"章法"};
+      var html = '<div class="panel"><div class="cat-title">' + esc(cat.n) + '</div>';
+      for(var ri = 0; ri < cat.rules.length; ri++){
+        var rr = cat.rules[ri];
+        html += '<div class="rule-item">'
+          + '<div class="rule-name">' + esc(rr.r)
+          + '<span class="rule-viz">' + (vizName[rr.v] || "点拨") + '</span></div>'
+          + '<div class="rule-tip">' + esc(rr.t) + '</div>'
+          + (rr.e ? '<div class="rule-err">✗ ' + esc(rr.e) + '</div>' : '')
+          + (rr.c && rr.c.length ? '<div class="rule-chips">'
+              + rr.c.slice(0, 12).map(function(x){ return '<button class="chip" type="button" data-c="' + esc(x) + '">' + esc(x) + '</button>'; }).join("")
+              + '</div>' : '')
+          + '</div>';
+      }
+      html += '</div>';
+      var box0 = document.getElementById("rulebox");
+      box0.innerHTML = html;
+      box0.scrollIntoView({behavior: "smooth", block: "nearest"});
       return;
     }
     var rc = t.closest ? t.closest("[data-rule]") : null;
@@ -465,6 +551,7 @@
     PAGE = d.page || 40;
     HOT = d.hot || [];
     RULES = d.rules || [];
+    CATS = d.cats || [];
     var i;
     for(i = 0; i < LIST.length; i++) IDX[LIST[i]] = i;
     READY = true;
