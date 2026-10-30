@@ -129,6 +129,19 @@
   .bp{stroke-dashoffset:0}
   .run .bp{animation:bpdraw .34s linear backwards}
   .run .bpg{animation:bpulse 2.2s ease-in-out infinite}
+
+  /* 错格：入场轻抖 + 红色 ✗ 角标，强化对错对比 */
+  @keyframes wob{0%,100%{transform:translateX(0)}20%{transform:translateX(-3px)}60%{transform:translateX(3px)}}
+  .run .wob{animation:wob .5s ease-in-out 2}
+  .frame.wob::after{content:"✗";position:absolute;top:3px;right:7px;color:var(--cinnabar);
+    font-weight:800;font-size:17px;line-height:1;text-shadow:0 1px 0 #fff}
+  .frame.ok::after{content:"✓";position:absolute;top:3px;right:7px;color:var(--green);
+    font-weight:800;font-size:17px;line-height:1;text-shadow:0 1px 0 #fff}
+
+  /* 规律大全：每条规律下方的对错示范 */
+  .rule-demo{margin:8px 0 2px}
+  .rule-demo .pair{margin:6px 0 2px}
+  .rule-cap{font-size:10.5px;color:var(--ink2);text-align:center;margin:2px 0 0}
 </style>
 </head>
 <body>
@@ -158,6 +171,7 @@
   "use strict";
   var INK = "#2c2825", BROWN = "#5d4433", KEY = "#a8352a", DUR = 0.34, TOTAL = 1.15;
   var LIST = [], IDX = {}, PAGE = 40, HOT = [], RULES = [], CATS = [], READY = false, cache = {}, uid = 0, SEQ = 0;
+  var RULE_DEMO = {};
 
   var qEl = document.getElementById("q");
   var goEl = document.getElementById("go");
@@ -186,12 +200,11 @@
   }
 
   /* ---------- 图形 ---------- */
+  /* 田字格：外框 + 中横 + 中竖（无对角线），保证字体落在格内 */
   function mige(){
-    return '<rect x="26" y="26" width="972" height="972" fill="none" stroke="' + "#d9a89c" + '" stroke-width="7" rx="6"/>'
-      + '<line x1="512" y1="26" x2="512" y2="998" stroke="#e6c4ba" stroke-width="3" stroke-dasharray="16 13"/>'
-      + '<line x1="26" y1="512" x2="998" y2="512" stroke="#e6c4ba" stroke-width="3" stroke-dasharray="16 13"/>'
-      + '<line x1="26" y1="26" x2="998" y2="998" stroke="#eddfc9" stroke-width="3" stroke-dasharray="16 13"/>'
-      + '<line x1="998" y1="26" x2="26" y2="998" stroke="#eddfc9" stroke-width="3" stroke-dasharray="16 13"/>';
+    return '<rect x="26" y="26" width="972" height="972" fill="none" stroke="#d9a89c" stroke-width="7" rx="6"/>'
+      + '<line x1="512" y1="26" x2="512" y2="998" stroke="#edc9bf" stroke-width="3" stroke-dasharray="16 13"/>'
+      + '<line x1="26" y1="512" x2="998" y2="512" stroke="#edc9bf" stroke-width="3" stroke-dasharray="16 13"/>';
   }
 
   /* 规律辅助层：示意等距 / 对正重心 / 主笔伸展 / 宽窄 / 字形轮廓（淡色，不遮笔画） */
@@ -228,15 +241,13 @@
     return d;
   }
 
-  /* 逐笔描红：mask 内白色粗中线 dashoffset 100→0，沿笔迹揭示笔画轮廓 */
-  function drawSvg(strokes, medians, color, keys, opts){
+  /* 逐笔描红：mask 内白色粗中线 dashoffset 100→0，沿笔迹揭示笔画轮廓。
+     charInner 返回 <svg> 内部内容（不含外层 svg 标签），便于在排布动画里按 <g> 复用。 */
+  function charInner(strokes, medians, color, keys, opts){
     opts = opts || {};
-    var id = "u" + (++uid), out = ['<svg viewBox="0 0 1024 1024" preserveAspectRatio="xMidYMid meet">'];
-    out.push(mige());
-    if(opts.viz) out.push(vizLayer(opts.viz));
-    out.push('<defs>');
-    var i, n = strokes.length, tf = opts.tf || {};
+    var id = "u" + (++uid), out = [], i, n = strokes.length, tf = opts.tf || {};
     var step = n > 1 ? Math.min(0.22, TOTAL / n) : 0;
+    out.push('<defs>');
     for(i = 0; i < n; i++){
       var mp = medianPath(medians[i]);
       if(!mp) continue;
@@ -250,11 +261,24 @@
     out.push('<g' + (opts.wrong ? ' class="bpg"' : '') + '>');
     for(i = 0; i < n; i++){
       var fill = (keys && keys.indexOf(i) >= 0) ? KEY : color;
+      // 错格中，被形变的笔画标红，让「错在哪」一目了然
+      if(opts.wrong && tf[i]) fill = "#a8352a";
+      else if(opts.wrong) fill = BROWN;
       out.push('<path d="' + strokes[i] + '"' + (tf[i] ? ' transform="' + tf[i] + '"' : '')
         + ' fill="' + fill + '"' + (opts.still ? '' : ' mask="url(#' + id + 'm' + i + ')"') + '/>');
     }
-    out.push('</g></svg>');
+    out.push('</g>');
     return out.join("");
+  }
+
+  function drawSvg(strokes, medians, color, keys, opts){
+    opts = opts || {};
+    var svg = '<svg viewBox="0 0 1024 1024" preserveAspectRatio="xMidYMid meet">';
+    if(!opts.nogrid) svg += mige();
+    if(opts.viz) svg += vizLayer(opts.viz);
+    svg += charInner(strokes, medians, color, keys, opts);
+    svg += '</svg>';
+    return svg;
   }
 
   /* ---------- 渲染 ---------- */
@@ -270,7 +294,7 @@
       return '<div class="pair single">'
         + '<div class="cell">'
         +   '<div class="cap ok">✓ 正确写法</div>'
-        +   frame(rightSvg)
+        +   frame(rightSvg).replace('class="frame"', 'class="frame ok"')
         +   '<div class="capnote">' + esc(tip.y || "") + '</div>'
         + '</div></div>';
     }
@@ -278,14 +302,49 @@
     return '<div class="pair">'
       + '<div class="cell">'
       +   '<div class="cap ng">✗ 常见错误</div>'
-      +   frame(wrongSvg)
+      +   frame(wrongSvg).replace('class="frame"', 'class="frame wob"')
       +   '<div class="capnote">' + esc(tip.x || "") + '</div>'
       + '</div>'
       + '<div class="cell">'
       +   '<div class="cap ok">✓ 正确写法</div>'
-      +   frame(rightSvg)
+      +   frame(rightSvg).replace('class="frame"', 'class="frame ok"')
       +   '<div class="capnote">' + esc(tip.y || "") + '</div>'
       + '</div></div>';
+  }
+
+  /* 章法/临帖类：三字排布「对错对比」——正确=均匀端正，错误=疏密失衡/歪斜 */
+  function _rowSvg(chars, wrong){
+    var n = chars.length, gap = 1024 / n, parts = ['<svg viewBox="0 0 1024 1024" preserveAspectRatio="xMidYMid meet">'];
+    for(var i = 0; i < n; i++){
+      var ch = chars[i]; if(!ch) continue;
+      var cx = (i + 0.5) * gap;                         // 该字所在格中心
+      var sc = 0.34;                                   // 缩放进格，三字并排不挤
+      var tf = "translate(" + cx + " 512) scale(" + sc + ") translate(-512 -512)";
+      if(wrong){
+        var k = (i - (n - 1) / 2);
+        var dx = k * 26, rot = k * 5, dy = (i % 2 ? 16 : -10);
+        tf = "translate(" + cx + " 512) rotate(" + rot + ") translate(" + dx + " " + dy + ") scale(" + sc + ") translate(-512 -512)";
+      }
+      parts.push('<g' + (wrong ? ' class="bpg"' : '') + ' transform="' + tf + '">'
+        + charInner(ch.s, ch.p, wrong ? BROWN : INK, [], {still:true}) + '</g>');
+    }
+    parts.push('</svg>');
+    return parts.join("");
+  }
+
+  function pairLayoutHtml(chars){
+    if(!chars || chars.length < 1){
+      return '<div class="pair single"><div class="cell"><div class="cap ok">✓ 正确写法</div>'
+        + frame(_rowSvg([{s:[],p:[]}], false)) + '</div></div>';
+    }
+    var ok = '<div class="pair">'
+      + '<div class="cell"><div class="cap ng">✗ 常见错误</div>'
+      + frame(_rowSvg(chars, true)).replace('class="frame"', 'class="frame wob"')
+      + '<div class="capnote">字距失衡 · 行气断裂</div></div>'
+      + '<div class="cell"><div class="cap ok">✓ 正确写法</div>'
+      + frame(_rowSvg(chars, false)).replace('class="frame"', 'class="frame ok"')
+      + '<div class="capnote">行气连贯 · 错落有致</div></div></div>';
+    return ok;
   }
 
   function ruleColor(name){
@@ -368,7 +427,50 @@
       + '<div class="empty">「' + esc(ch) + '」不在练字知识库中<br>试试常用字，或换一个字</div></section>';
   }
 
-  /* 进入视口才启动动画（省算力，长列表更流畅） */
+  /* ---------- 规律大全：就地渲染对错示范 ---------- */
+  function fetchChar(ch, cb){
+    var gi = IDX[ch];
+    if(gi === undefined){ cb(null); return; }
+    var pi = Math.floor(gi / PAGE), off = gi % PAGE;
+    function done(d){
+      if(!d || !d.c || d.c[off] !== ch){ cb(null); return; }
+      var e = d.d[off];
+      cb({s: e.s, p: e.p});
+    }
+    if(cache[pi]) done(cache[pi]);
+    else xhr("data/p" + pad3(pi) + ".json", function(d){ if(d) cache[pi] = d; done(d); });
+  }
+  function fetchChars(list, cb){
+    var out = {}, pending = list.length;
+    if(!pending){ cb({}); return; }
+    list.forEach(function(ch){
+      fetchChar(ch, function(hw){ if(hw) out[ch] = hw; if(--pending === 0) cb(out); });
+    });
+  }
+  function parseObj(s){ try { return JSON.parse(s); } catch(e){ return {}; } }
+  function renderRuleDemos(box){
+    var demos = box.querySelectorAll(".rule-demo");
+    for(var i = 0; i < demos.length; i++){
+      (function(el){
+        var key = el.getAttribute("data-rd");
+        var info = RULE_DEMO[key];
+        if(!info){ el.innerHTML = ""; return; }
+        if(info.lt === "layout"){
+          var s = (info.sample || []).slice();
+          fetchChars(s, function(map){
+            var chs = s.map(function(x){ return map[x]; }).filter(Boolean);
+            el.innerHTML = chs.length ? pairLayoutHtml(chs) : "";
+          });
+        } else {
+          if(!info.d){ el.innerHTML = ""; return; }
+          fetchChar(info.d, function(hw){
+            if(!hw){ el.innerHTML = ""; return; }
+            el.innerHTML = pairHtml({o: info.o || {}, x:"", y:""}, hw);
+          });
+        }
+      })(demos[i]);
+    }
+  }
   function startAnim(root){
     var frames = root.querySelectorAll(".frame");
     var i;
@@ -489,10 +591,12 @@
       var ci = +cc.getAttribute("data-cat");
       var cat = CATS[ci];
       if(!cat) return;
-      var vizName = {equal:"等距", align:"对正", stretch:"伸展", width:"宽窄", shape:"字形", text:"章法"};
+      var vizName = {equal:"等距", align:"对正", stretch:"伸展", width:"宽窄", shape:"字形", text:"章法/排布"};
       var html = '<div class="panel"><div class="cat-title">' + esc(cat.n) + '</div>';
       for(var ri = 0; ri < cat.rules.length; ri++){
         var rr = cat.rules[ri];
+        var key = "rd" + ci + "_" + ri;
+        RULE_DEMO[key] = {d: rr.d, o: rr.o, lt: rr.lt, sample: rr.sample};
         html += '<div class="rule-item">'
           + '<div class="rule-name">' + esc(rr.r)
           + '<span class="rule-viz">' + (vizName[rr.v] || "点拨") + '</span></div>'
@@ -501,11 +605,13 @@
           + (rr.c && rr.c.length ? '<div class="rule-chips">'
               + rr.c.slice(0, 12).map(function(x){ return '<button class="chip" type="button" data-c="' + esc(x) + '">' + esc(x) + '</button>'; }).join("")
               + '</div>' : '')
+          + '<div class="rule-demo" data-rd="' + key + '"></div>'
           + '</div>';
       }
       html += '</div>';
       var box0 = document.getElementById("rulebox");
       box0.innerHTML = html;
+      renderRuleDemos(box0);
       box0.scrollIntoView({behavior: "smooth", block: "nearest"});
       return;
     }
